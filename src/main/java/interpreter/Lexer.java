@@ -109,7 +109,7 @@ public class Lexer {
         }
 
         addToken(TokenType.NUMBER,
-                Double.parseDouble(source.substring(start, current)));
+                Double.valueOf(source.substring(start, current)));
     }
 
     private void string() {
