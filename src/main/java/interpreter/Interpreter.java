@@ -1,6 +1,7 @@
 package interpreter;
 
 import java.io.*;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 /**
@@ -99,7 +100,10 @@ public class Interpreter {
             // For simplicity, just print the lines being executed
             System.out.println("Executing line " + programCounter + ": " + code);
 
-            // Here, you'd parse and interpret each line (to be implemented in Parser)
+            Lexer lexer = new Lexer(code);
+            List<Token> tokens = lexer.scanTokens(); // Get the tokens from the lexer
+            Parser parser = new Parser(tokens);    // Pass the tokens to the parser
+            parser.parse();                       // Parse the tokens
         }
 
         System.out.println("BASIC> PROGRAM EXECUTION COMPLETE.");
