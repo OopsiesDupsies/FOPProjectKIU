@@ -31,12 +31,42 @@ public class Parser {
     private void parseLetStatement() {
         Token identifier = consume(TokenType.IDENTIFIER, "Expect variable name after LET.");
         consume(TokenType.EQUALS, "Expect '=' after variable name.");
-        Token value = consume(TokenType.NUMBER, "Expect value after '='.");
+        // Get the first value (either number or variable)
+        double result = parseValue();
 
-        // Store the variable in the symbol table
-        symbolTable.put(identifier.lexeme, value.literal);
+        // Check if there are more tokens (arithmetic operations)
+        while (!isAtEnd() && isArithmeticOperator(peek().type)) {
+            Token operator = advance();
+            double rightOperand = parseValue();
+            // Perform the arithmetic operation
+            switch (operator.type) {
+                case PLUS:
+                    result += rightOperand;
+                    break;
+                case MINUS:
+                    result -= rightOperand;
+                    break;
+                case MULTIPLY:
+                    result *= rightOperand;
+                    break;
+                case DIVIDE:
+                    if (rightOperand == 0) {
+                        throw new RuntimeException("Division by zero.");
+                    }
+                    result /= rightOperand;
+                    break;
+                case MOD:
+                    if (rightOperand == 0) {
+                        throw new RuntimeException("Modulo by zero.");
+                    }
+                    result %= rightOperand;
+                    break;
+            }
+        }
 
-        System.out.println("LET statement: " + identifier.lexeme + " = " + value.lexeme);
+        // Store the final result in the symbol table
+        symbolTable.put(identifier.lexeme, result);
+        System.out.println("LET statement: " + identifier.lexeme + " = " + result);
     }
 
     // Parse a PRINT statement
@@ -45,7 +75,7 @@ public class Parser {
 
         if (expression.type == TokenType.STRING) {
             // If it's a string, print it
-            System.out.println(expression.lexeme);
+            System.out.println(expression.lexeme.substring(1, expression.lexeme.length() - 1));
         } else if (expression.type == TokenType.IDENTIFIER) {
             // If it's an identifier (variable), print its value from the symbol table
             Object value = symbolTable.get(expression.lexeme);
@@ -60,6 +90,65 @@ public class Parser {
     }
 
     // Helper methods
+    private double parseValue() {
+        Token token = advance();
+        if (token.type == TokenType.NUMBER) {
+            return (double) token.literal;
+        } else if (token.type == TokenType.IDENTIFIER) {
+            Object value = symbolTable.get(token.lexeme);
+            if (value == null) {
+                throw new RuntimeException("Undefined variable: " + token.lexeme);
+            }
+            return (double) value;
+        } else if (token.type == TokenType.LEFT_PAREN) {
+            double result = parseParenthesizedExpression();
+            consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
+            return result;
+        }
+        throw new RuntimeException("Expect number or variable.");
+    }
+
+    private double parseParenthesizedExpression() {
+        double result = parseValue();
+
+        while (!isAtEnd() && peek().type != TokenType.RIGHT_PAREN && isArithmeticOperator(peek().type)) {
+            Token operator = advance();
+            double rightOperand = parseValue();
+
+            switch (operator.type) {
+                case PLUS:
+                    result += rightOperand;
+                    break;
+                case MINUS:
+                    result -= rightOperand;
+                    break;
+                case MULTIPLY:
+                    result *= rightOperand;
+                    break;
+                case DIVIDE:
+                    if (rightOperand == 0) {
+                        throw new RuntimeException("Division by zero.");
+                    }
+                    result /= rightOperand;
+                    break;
+                case MOD:
+                    if (rightOperand == 0) {
+                        throw new RuntimeException("Modulo by zero.");
+                    }
+                    result %= rightOperand;
+                    break;
+            }
+        }
+
+        return result;
+    }
+
+    private boolean isArithmeticOperator(TokenType type) {
+        return type == TokenType.PLUS || type == TokenType.MINUS ||
+                type == TokenType.MULTIPLY || type == TokenType.DIVIDE ||
+                type == TokenType.MOD;
+    }
+
     private Token consume(TokenType type, String message) {
         if (check(type)) {
             return advance();
@@ -90,127 +179,4 @@ public class Parser {
     private Token previous() {
         return tokens.get(current - 1);
     }
-
-    // Parse arithmetic expressions
-    private Object parseExpression() {
-        return parseTerm();
-    }
-
-    // Parse terms (handles *, /, %)
-    private Object parseTerm() {
-        Object expr = parseFactor();
-
-        while (match(TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.MOD)) {
-            Token operator = previous();
-            Object right = parseFactor();
-            expr = evaluateBinary(expr, operator, right);
-        }
-
-        return expr;
-    }
-
-    // Parse factors (handles +, -)
-    private Object parseFactor() {
-        Object expr = parsePrimary();
-
-        while (match(TokenType.PLUS, TokenType.MINUS)) {
-            Token operator = previous();
-            Object right = parsePrimary();
-            expr = evaluateBinary(expr, operator, right);
-        }
-
-        return expr;
-    }
-
-    // Parse primary expressions (numbers, variables, parentheses)
-    private Object parsePrimary() {
-        if (match(TokenType.NUMBER)) {
-            return Double.parseDouble(previous().lexeme);
-        }
-        if (match(TokenType.IDENTIFIER)) {
-            String varName = previous().lexeme;
-            Object value = symbolTable.get(varName);
-            if (value == null) {
-                throw new RuntimeException("Undefined variable: " + varName);
-            }
-            return value;
-        }
-        if (match(TokenType.LEFT_PAREN)) {
-            Object expr = parseExpression();
-            consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
-            return expr;
-        }
-
-        throw new RuntimeException("Expect expression.");
-    }
-
-    // Evaluate binary operations
-    private Object evaluateBinary(Object left, Token operator, Object right) {
-        double leftNum = (double) left;
-        double rightNum = (double) right;
-
-        switch (operator.type) {
-            case PLUS: return leftNum + rightNum;
-            case MINUS: return leftNum - rightNum;
-            case MULTIPLY: return leftNum * rightNum;
-            case DIVIDE:
-                if (rightNum == 0) throw new RuntimeException("Division by zero.");
-                return leftNum / rightNum;
-            case MOD: return leftNum % rightNum;
-            default: throw new RuntimeException("Unknown operator.");
-        }
-    }
-
-    private boolean match(TokenType... types) {
-        for (TokenType type : types) {
-            if (check(type)) {
-                advance();  // Move to the next token if there's a match
-                return true;
-            }
-        }
-        return false;
-    }
-    // Parse conditionals
-    private boolean parseConditional() {
-        Object left = parseExpression();
-        Token operator = advance();
-        Object right = parseExpression();
-
-        return evaluateConditional(left, operator, right);
-    }
-
-    // Evaluate conditionals
-    private boolean evaluateConditional(Object left, Token operator, Object right) {
-        double leftNum = (double) left;
-        double rightNum = (double) right;
-
-        switch (operator.type) {
-            case LESS: return leftNum < rightNum;
-            case LESS_EQUAL: return leftNum <= rightNum;
-            case GREATER: return leftNum > rightNum;
-            case GREATER_EQUAL: return leftNum >= rightNum;
-            case NOT_EQUALS: return leftNum != rightNum;
-            default: throw new RuntimeException("Unknown operator.");
-        }
-    }
-
-    // Parse WHILE loop
-    private void parseWhileLoop() {
-        consume(TokenType.WHILE, "Expect 'WHILE' keyword.");
-        int loopStart = current;  // Save the loop's starting point
-
-        while (parseConditional()) {
-            parse();  // Execute the body of the loop
-
-            // Reset to the start of the loop for the next iteration
-            current = loopStart;
-        }
-
-        consume(TokenType.WEND, "Expect 'WEND' keyword to close loop.");
-    }
-
-
-
-
-
 }
