@@ -7,13 +7,15 @@ public class Parser {
     private final List<Token> tokens;
     private int current = 0;
     static Map<String, Object> symbolTable = new HashMap<>();
+    private Map<Integer, Integer> lineNumbers = new HashMap<>();
 
-    public Parser(List<Token> tokens) {
+    public Parser(List<Token> tokens, Map<Integer, Integer> lineNumbers) {
         this.tokens = tokens;
+        this.lineNumbers = lineNumbers;
     }
 
     // Method to parse the whole program
-    public void parse() {
+    public int parse() {
         while (!isAtEnd()) {
             Token token = advance();  // Get the first token of the line
 
@@ -21,9 +23,64 @@ public class Parser {
                 parseLetStatement();
             } else if (token.type == TokenType.PRINT) {
                 parsePrintStatement();
-            } else {
-                // Handle other types of statements
+            } else if (token.type == TokenType.IF) {
+                return parseIfStatement();
+            } else if (token.type == TokenType.GOTO) {
+                return parseGotoStatement();
             }
+        }
+
+        return -1;
+    }
+
+    private int parseIfStatement() {
+        double left = parseValue();
+
+        // Get comparison operator
+        Token operator = advance();
+        if (!isComparisonOperator(operator.type)) {
+            throw new RuntimeException("Expected comparison operator.");
+        }
+
+        double right = parseValue();
+
+        // Evaluate condition
+        boolean condition = evaluateCondition(left, operator.type, right);
+
+        consume(TokenType.THEN, "Expected THEN after condition.");
+        Token gotoLine = advance();
+        int targetLine = Integer.parseInt(gotoLine.lexeme);
+
+        if (condition) {
+            return targetLine;
+        }
+
+        return -1;
+    }
+
+    private int parseGotoStatement() {
+        Token lineToken = advance();
+        if (lineToken.type != TokenType.NUMBER) {
+            throw new RuntimeException("Expected line number after GOTO");
+        }
+
+        int targetLine = ((Double) lineToken.literal).intValue();
+        if (!lineNumbers.containsKey(targetLine)) {
+            throw new RuntimeException("Invalid GOTO line number: " + targetLine);
+        }
+
+        return targetLine;
+    }
+
+    private boolean evaluateCondition(double left, TokenType operator, double right) {
+        switch (operator) {
+            case LESS: return left < right;
+            case LESS_EQUAL: return left <= right;
+            case GREATER: return left > right;
+            case GREATER_EQUAL: return left >= right;
+            case EQUALS: return left == right;
+            case NOT_EQUALS: return left != right;
+            default: throw new RuntimeException("Invalid comparison operator.");
         }
     }
 
@@ -147,6 +204,12 @@ public class Parser {
         return type == TokenType.PLUS || type == TokenType.MINUS ||
                 type == TokenType.MULTIPLY || type == TokenType.DIVIDE ||
                 type == TokenType.MOD;
+    }
+
+    private boolean isComparisonOperator(TokenType type) {
+        return type == TokenType.LESS || type == TokenType.LESS_EQUAL ||
+                type == TokenType.GREATER || type == TokenType.GREATER_EQUAL ||
+                type == TokenType.EQUALS || type == TokenType.NOT_EQUALS;
     }
 
     private Token consume(TokenType type, String message) {

@@ -15,7 +15,7 @@ public enum TokenType {
 
     // Keywords
     LET, PRINT, INPUT,
-    IF, THEN, ELSE, ENDIF,
+    IF, THEN, ELSE, ENDIF, GOTO,
     WHILE, WEND,
     END, REM,
 

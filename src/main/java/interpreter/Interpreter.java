@@ -1,6 +1,7 @@
 package interpreter;
 
 import java.io.*;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -92,18 +93,31 @@ public class Interpreter {
 
         System.out.println("BASIC> RUNNING PROGRAM...");
 
-        int programCounter = 0; // Simulates the Program Counter (PC)
-        for (Map.Entry<Integer, String> entry : programLines.entrySet()) {
-            programCounter = entry.getKey(); // The current "line number"
-            String code = entry.getValue();
+        // Create line number mapping for GOTO
+        Map<Integer, Integer> lineMapping = new HashMap<>();
+        int index = 0;
+        for (int lineNum : programLines.keySet()) {
+            lineMapping.put(lineNum, index++);
+        }
 
-            // For simplicity, just print the lines being executed
-            System.out.println("Executing line " + programCounter + ": " + code);
+        Integer currentLine = programLines.firstKey();
+        while (currentLine != -1 && programLines.containsKey(currentLine)) {
+            String code = programLines.get(currentLine);
+            System.out.println("Executing line " + currentLine + ": " + code);
 
             Lexer lexer = new Lexer(code);
-            List<Token> tokens = lexer.scanTokens(); // Get the tokens from the lexer
-            Parser parser = new Parser(tokens);    // Pass the tokens to the parser
-            parser.parse();                       // Parse the tokens
+            List<Token> tokens = lexer.scanTokens();
+            Parser parser = new Parser(tokens, lineMapping);
+
+            int nextLine = parser.parse();
+            if (nextLine != -1) {
+                currentLine = nextLine;  // GOTO or IF THEN jump
+            } else {
+                currentLine = programLines.higherKey(currentLine);  // Next line
+                if (currentLine == null) {
+                    break;
+                }
+            }
         }
 
         System.out.println("BASIC> PROGRAM EXECUTION COMPLETE.");
