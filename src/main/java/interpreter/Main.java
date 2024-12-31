@@ -1,7 +1,6 @@
 package interpreter;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Scanner;
 import java.util.TreeMap;
 
@@ -9,7 +8,7 @@ import java.util.TreeMap;
  * Main class to handle user input and manage the BASIC interpreter.
  */
 public class Main {
-    private static TreeMap<Integer, String> programLines = new TreeMap<>(); // Stores program lines with line numbers
+    static TreeMap<Integer, String> programLines = new TreeMap<>(); // Stores program lines with line numbers
     private static Interpreter interpreter = new Interpreter(); // Interpreter instance for executing commands
     private static final String SAVES_DIRECTORY = "saves"; // Directory for saving program files
 

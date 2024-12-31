@@ -26,6 +26,7 @@ public class Lexer {
         keywords.put("WEND", TokenType.WEND);
         keywords.put("END", TokenType.END);
         keywords.put("REM", TokenType.REM);
+        keywords.put("GOTO", TokenType.GOTO);
     }
 
     public Lexer(String source) {
