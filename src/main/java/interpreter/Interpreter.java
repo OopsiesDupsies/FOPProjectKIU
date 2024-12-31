@@ -107,7 +107,7 @@ public class Interpreter {
 
             Lexer lexer = new Lexer(code);
             List<Token> tokens = lexer.scanTokens();
-            Parser parser = new Parser(tokens, lineMapping);
+            Parser parser = new Parser(tokens, lineMapping, currentLine);
 
             int nextLine = parser.parse();
             if (nextLine != -1) {

@@ -4,20 +4,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 
+import static interpreter.Main.programLines;
+
 public class Parser {
     private final List<Token> tokens;
     private int current = 0;
     static Map<String, Object> symbolTable = new HashMap<>();
     private Map<Integer, Integer> lineNumbers = new HashMap<>();
     // Fields for WHILE loop support
-    private boolean inWhileLoop = false;
-    private int whileLineNumber = -1;
-    private Token whileCondition = null;
+    private static boolean inWhileLoop = false;
+    private static int whileLineNumber = -1;
+    private final int currentLine;
 
 
-    public Parser(List<Token> tokens, Map<Integer, Integer> lineNumbers) {
+    public Parser(List<Token> tokens, Map<Integer, Integer> lineNumbers, int currentLine) {
         this.tokens = tokens;
         this.lineNumbers = lineNumbers;
+        this.currentLine = currentLine;
     }
 
     // Method to parse the whole program
@@ -55,57 +58,6 @@ public class Parser {
         }
 
         return -1;
-    }
-
-    private int parseIfStatement() {
-        double left = parseValue();
-
-        // Get comparison operator
-        Token operator = advance();
-        if (!isComparisonOperator(operator.type)) {
-            throw new RuntimeException("Expected comparison operator.");
-        }
-
-        double right = parseValue();
-
-        // Evaluate condition
-        boolean condition = evaluateCondition(left, operator.type, right);
-
-        consume(TokenType.THEN, "Expected THEN after condition.");
-        Token gotoLine = advance();
-        int targetLine = Integer.parseInt(gotoLine.lexeme);
-
-        if (condition) {
-            return targetLine;
-        }
-
-        return -1;
-    }
-
-    private int parseGotoStatement() {
-        Token lineToken = advance();
-        if (lineToken.type != TokenType.NUMBER) {
-            throw new RuntimeException("Expected line number after GOTO");
-        }
-
-        int targetLine = ((Double) lineToken.literal).intValue();
-        if (!lineNumbers.containsKey(targetLine)) {
-            throw new RuntimeException("Invalid GOTO line number: " + targetLine);
-        }
-
-        return targetLine;
-    }
-
-    private boolean evaluateCondition(double left, TokenType operator, double right) {
-        switch (operator) {
-            case LESS: return left < right;
-            case LESS_EQUAL: return left <= right;
-            case GREATER: return left > right;
-            case GREATER_EQUAL: return left >= right;
-            case EQUALS: return left == right;
-            case NOT_EQUALS: return left != right;
-            default: throw new RuntimeException("Invalid comparison operator.");
-        }
     }
 
     // Parse a LET statement (variable assignment)
@@ -170,7 +122,175 @@ public class Parser {
         }
     }
 
+    private int parseIfStatement() {
+        double left = parseValue();
+
+        // Get comparison operator
+        Token operator = advance();
+        if (!isComparisonOperator(operator.type)) {
+            throw new RuntimeException("Expected comparison operator.");
+        }
+
+        double right = parseValue();
+
+        // Evaluate condition
+        boolean condition = evaluateCondition(left, operator.type, right);
+
+        consume(TokenType.THEN, "Expected THEN after condition.");
+        Token gotoLine = advance();
+        int targetLine = Integer.parseInt(gotoLine.lexeme);
+
+        if (condition) {
+            return targetLine;
+        }
+
+        return -1;
+    }
+
+    private int parseGotoStatement() {
+        Token lineToken = advance();
+        if (lineToken.type != TokenType.NUMBER) {
+            throw new RuntimeException("Expected line number after GOTO");
+        }
+
+        int targetLine = ((Double) lineToken.literal).intValue();
+        if (!lineNumbers.containsKey(targetLine)) {
+            throw new RuntimeException("Invalid GOTO line number: " + targetLine);
+        }
+
+        return targetLine;
+    }
+
+    // Add WHILE loop support
+    private int parseWhileStatement() {
+        // Only set inWhileLoop if we're not already in the loop
+        if (!inWhileLoop) {
+            whileLineNumber = getCurrentLineNumber();
+            inWhileLoop = true;
+        }
+
+        // Parse condition
+        double left = parseValue();
+        Token operator = advance();
+        if (!isComparisonOperator(operator.type)) {
+            throw new RuntimeException("Expected comparison operator in WHILE statement");
+        }
+        double right = parseValue();
+
+        // Evaluate condition
+        boolean condition = evaluateCondition(left, operator.type, right);
+        if (!condition) {
+            // Reset while loop state
+            inWhileLoop = false;
+            whileLineNumber = -1;
+            // Find and skip to after WEND
+            int wendLine = findWendLine();
+            Integer nextLine = programLines.higherKey(wendLine);
+            return (nextLine != null) ? nextLine : -1;
+        }
+
+        return -1; // Continue to next line
+    }
+
+    private int handleWend() {
+        if (!inWhileLoop) {
+            throw new RuntimeException("WEND without WHILE");
+        }
+        return whileLineNumber; // Return to WHILE line for reevaluation
+    }
+
+    // Method to handle variable assignment without LET keyword
+    private void parseAssignment() {
+        Token identifier = previous(); // The identifier was already consumed
+        consume(TokenType.EQUALS, "Expect '=' after variable name.");
+        double result = parseValue();
+
+        // Handle arithmetic operations
+        while (!isAtEnd() && isArithmeticOperator(peek().type)) {
+            Token operator = advance();
+            double rightOperand = parseValue();
+
+            switch (operator.type) {
+                case PLUS:
+                    result += rightOperand;
+                    break;
+                case MINUS:
+                    result -= rightOperand;
+                    break;
+                case MULTIPLY:
+                    result *= rightOperand;
+                    break;
+                case DIVIDE:
+                    if (rightOperand == 0) {
+                        throw new RuntimeException("Division by zero.");
+                    }
+                    result /= rightOperand;
+                    break;
+                case MOD:
+                    if (rightOperand == 0) {
+                        throw new RuntimeException("Modulo by zero.");
+                    }
+                    result %= rightOperand;
+                    break;
+            }
+        }
+
+        symbolTable.put(identifier.lexeme, result);
+        System.out.println("Assignment: " + identifier.lexeme + " = " + result);
+    }
+
     // Helper methods
+    private int evaluateWhileLoop() {
+        // Re-evaluate the while condition
+        current = 0; // Reset position to start of tokens
+        Token token = advance();
+        if (token.type != TokenType.WHILE) {
+            throw new RuntimeException("Expected WHILE statement");
+        }
+
+        double left = parseValue();
+        Token operator = advance();
+        double right = parseValue();
+
+        boolean condition = evaluateCondition(left, operator.type, right);
+        if (!condition) {
+            inWhileLoop = false;
+            whileLineNumber = -1;
+            return findWendLine();
+        }
+
+        return -1; // Continue execution
+    }
+
+    private int findWendLine() {
+        // Get the next line after current WHILE
+        Integer nextLine = getCurrentLineNumber();
+
+        // Search through program lines until we find WEND
+        while (nextLine != null) {
+            String code = programLines.get(nextLine);
+            Lexer tempLexer = new Lexer(code);
+            List<Token> tempTokens = tempLexer.scanTokens();
+
+            if (!tempTokens.isEmpty() && tempTokens.get(0).type == TokenType.WEND) {
+                return nextLine;
+            }
+
+            nextLine = programLines.higherKey(nextLine);
+        }
+        throw new RuntimeException("WEND not found for WHILE statement");
+    }
+
+    private int getCurrentLineNumber() {
+        // Get current line number based on position in program
+        for (Map.Entry<Integer, Integer> entry : lineNumbers.entrySet()) {
+            if (entry.getValue() == currentLine) {
+                return entry.getKey();
+            }
+        }
+        return -1;
+    }
+
     private double parseValue() {
         Token token = advance();
         if (token.type == TokenType.NUMBER) {
@@ -236,6 +356,18 @@ public class Parser {
                 type == TokenType.EQUALS || type == TokenType.NOT_EQUALS;
     }
 
+    private boolean evaluateCondition(double left, TokenType operator, double right) {
+        switch (operator) {
+            case LESS: return left < right;
+            case LESS_EQUAL: return left <= right;
+            case GREATER: return left > right;
+            case GREATER_EQUAL: return left >= right;
+            case EQUALS: return left == right;
+            case NOT_EQUALS: return left != right;
+            default: throw new RuntimeException("Invalid comparison operator.");
+        }
+    }
+
     private Token consume(TokenType type, String message) {
         if (check(type)) {
             return advance();
@@ -266,153 +398,4 @@ public class Parser {
     private Token previous() {
         return tokens.get(current - 1);
     }
-
-        // Method to handle variable assignment without LET keyword
-        private void parseAssignment() {
-            Token identifier = previous(); // The identifier was already consumed
-            consume(TokenType.EQUALS, "Expect '=' after variable name.");
-            double result = parseValue();
-
-            // Handle arithmetic operations
-            while (!isAtEnd() && isArithmeticOperator(peek().type)) {
-                Token operator = advance();
-                double rightOperand = parseValue();
-
-                switch (operator.type) {
-                    case PLUS:
-                        result += rightOperand;
-                        break;
-                    case MINUS:
-                        result -= rightOperand;
-                        break;
-                    case MULTIPLY:
-                        result *= rightOperand;
-                        break;
-                    case DIVIDE:
-                        if (rightOperand == 0) {
-                            throw new RuntimeException("Division by zero.");
-                        }
-                        result /= rightOperand;
-                        break;
-                    case MOD:
-                        if (rightOperand == 0) {
-                            throw new RuntimeException("Modulo by zero.");
-                        }
-                        result %= rightOperand;
-                        break;
-                }
-            }
-
-            symbolTable.put(identifier.lexeme, result);
-            System.out.println("Assignment: " + identifier.lexeme + " = " + result);
-        }
-
-        // Add WHILE loop support
-        private int parseWhileStatement() {
-            whileLineNumber = getCurrentLineNumber();
-            inWhileLoop = true;
-
-            // Parse condition
-            double left = parseValue();
-            Token operator = advance();
-            if (!isComparisonOperator(operator.type)) {
-                throw new RuntimeException("Expected comparison operator in WHILE statement");
-            }
-            double right = parseValue();
-
-            // Store condition for later evaluation
-            boolean condition = evaluateCondition(left, operator.type, right);
-            if (!condition) {
-                // Skip to WEND if condition is false
-                inWhileLoop = false;
-                whileLineNumber = -1;
-                return findWendLine();
-            }
-
-            return -1; // Continue to next line
-        }
-
-        private int handleWend() {
-            if (!inWhileLoop) {
-                throw new RuntimeException("WEND without WHILE");
-            }
-            return whileLineNumber; // Return to WHILE line for reevaluation
-        }
-
-    private int evaluateWhileLoop() {
-        // Re-evaluate the while condition
-        current = 0; // Reset position to start of tokens
-        Token token = advance();
-        if (token.type != TokenType.WHILE) {
-            throw new RuntimeException("Expected WHILE statement");
-        }
-
-        double left = parseValue();
-        Token operator = advance();
-        double right = parseValue();
-
-        boolean condition = evaluateCondition(left, operator.type, right);
-        if (!condition) {
-            inWhileLoop = false;
-            whileLineNumber = -1;
-            return findWendLine();
-        }
-
-        return -1; // Continue execution
-    }
-
-    private int findWendLine() {
-        // Save current position
-        int originalPosition = current;
-        boolean foundWend = false;
-        int wendLine = -1;
-
-        // Search through all lines after current position
-        for (Map.Entry<Integer, Integer> entry : lineNumbers.entrySet()) {
-            if (entry.getKey() > getCurrentLineNumber()) {
-                int nestLevel = 0;
-
-                // Find tokens for this line
-                while (current < tokens.size()) {
-                    Token token = tokens.get(current);
-                    if (token.type == TokenType.WHILE) {
-                        nestLevel++;
-                    } else if (token.type == TokenType.WEND) {
-                        if (nestLevel == 0) {
-                            wendLine = entry.getKey();
-                            foundWend = true;
-                            break;
-                        }
-                        nestLevel--;
-                    }
-                    current++;
-                }
-
-                if (foundWend) {
-                    break;
-                }
-            }
-        }
-
-        // Restore original position
-        current = originalPosition;
-
-        if (!foundWend) {
-            throw new RuntimeException("WEND not found for WHILE statement");
-        }
-
-        return wendLine;
-    }
-
-
-    private int getCurrentLineNumber() {
-        // Get current line number based on position in program
-        for (Map.Entry<Integer, Integer> entry : lineNumbers.entrySet()) {
-            if (entry.getValue() == current) {
-                return entry.getKey();
-            }
-        }
-        return -1;
-    }
-
 }
