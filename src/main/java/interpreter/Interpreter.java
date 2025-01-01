@@ -120,6 +120,8 @@ public class Interpreter {
             }
         }
 
+        Parser.symbolTable.clear(); //remove the variables.
+
         System.out.println("BASIC> PROGRAM EXECUTION COMPLETE.");
     }
 }
