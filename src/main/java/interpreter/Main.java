@@ -25,7 +25,9 @@ public class Main {
 
         while (true) {
             System.out.print("BASIC> "); // Prompt for input
-            String input = scanner.nextLine().trim(); // Read user input and remove leading/trailing spaces
+
+            // Read user input and remove leading/trailing spaces
+            String input = scanner.nextLine().replaceFirst("^\\s+", "");
 
             // Handle commands
             if (input.equalsIgnoreCase("END")) {
