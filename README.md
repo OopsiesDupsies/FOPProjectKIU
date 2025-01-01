@@ -27,18 +27,54 @@
 ```
 "hi, the while loop hopefully worked, and this was printed after the while loop ended."
 
-  has to be numbered from 0 up.
-Let statement declares a variable, it can do arithmetic operations before assigning it to the variable too.
-after declaring and initializing a variable, you dont have to use the LET statement again, you just just write the variable name.
+---
 
-the IF statement compares 2 values, and then reads the number after it if its true, skipping to the numbered line that was written
-IF [condition] THEN [double]
+## Explanation of Commands:
 
-GOTO just expects a line number after it and skips to that number
+- **Numbering**:
+  
+    Lines must be numbered starting from 0 and increment sequentially.
+- **LET Statement**:
+  
+    The LET statement declares a variable and allows performing arithmetic operations before assigning the result to the variable.
 
-and then theres WHILE - WEND. it does what you expect, after WHILE you have to write similarly to the IF, but theres no THEN (obviously), its just a condition. if the co dition is true, it'll casually continue thriugh the next line, if its false, it'll skip past the WEND. upon reaching the WEND normally, it then is redirected back to the line where the WHILE statement is, and checks the condition again.
+-   After declaring and initializing a variable, you don’t need to use the LET statement again. You can directly reference the variable by its name in subsequent operations.
+- **IF Statement**:
 
-PRINT can just wrint a variable ir a String value.
+   The IF statement compares two values. If the condition is true, the program jumps to the specified line number, skipping the lines in between.
+
+ -   Syntax:
+
+    IF [condition] THEN [lineNumber]
+    
+  - GOTO Statement:
+    The GOTO statement jumps directly to a specified line number.
+
+   - Syntax:
+
+    GOTO [lineNumber]
+    
+- WHILE - WEND:
+
+    The WHILE loop allows conditional execution of a block of code until the condition becomes false.
+
+  -  After WHILE, write a condition (similar to IF, but without THEN).
+  -  If the condition is true, execution proceeds to the next line. If false, the program skips past the WEND.
+  -  Upon reaching the WEND, the program returns to the WHILE statement to recheck the condition.
+    
+  -  Syntax:
+
+          WHILE [condition]
+          ...
+          WEND
+     
+- PRINT Statement:
+The PRINT statement outputs either a variable or a string value.
+
+   - Syntax:
+
+          PRINT [variable or "string value"]
+
 ---
 The End!
 
