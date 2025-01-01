@@ -1,0 +1,36 @@
+1. Sum of First N Numbers:
+
+0 LET N = 10
+1 LET sum = 0
+2 LET i = 1
+3 WHILE i <= N
+4 sum = sum + i
+5 i = i + 1
+6 WEND
+7 PRINT sum
+
+
+
+2. Factorial:
+
+0 LET N = 5
+1 LET fact = 1
+2 LET i = 1
+3 WHILE i <= N
+4 fact = fact * i
+5 i = i + 1
+6 WEND
+7 PRINT fact
+
+
+
+3. GCD:
+
+0 LET a = 48
+1 LET b = 18
+2 WHILE b > 0
+3 LET temp = b
+4 b = a % b
+5 a = temp
+6 WEND
+7 PRINT a
